@@ -1,22 +1,30 @@
 package main
 
 import (
-	"log"
+	"bytes"
+	"encoding/json"
+	"gotempmail/api"
+	"gotempmail/models"
+	"gotempmail/store"
 	"io"
+	"log"
+	"net/http"
 
-	"github.com/emersion/go-smtp"
 	"github.com/emersion/go-sasl"
-	"gotempmail/sendmail"
+	"github.com/emersion/go-smtp"
 )
 
+
 type Backend struct{}
+
 
 func (bkd *Backend) NewSession(state *smtp.Conn) (smtp.Session, error) {
 	return &Session{}, nil
 }
 
 type Session struct {
-	auth bool
+	from string
+	to 	 string
 }
 
 func (s *Session) AuthMechanisms() []string {
@@ -29,20 +37,47 @@ func (s *Session) Auth(mech string) (sasl.Server, error) {
 
 func (s *Session) Mail(from string, opts *smtp.MailOptions) error {
 	log.Println("Mail from:", from)
+	s.from = from
 	return nil
 }
 
 func (s *Session) Rcpt(to string, opts *smtp.RcptOptions) error {
 	log.Println("Rcpt to:", to)
+	s.to = to
 	return nil
 }
 
 func (s *Session) Data(r io.Reader) error {
-	if b, err := io.ReadAll(r); err != nil {
+
+	b, err := io.ReadAll(r)
+	if err != nil {
 		return err
-	} else {
-		log.Println("Data:", string(b))
+	} 
+
+	mail := models.Email{
+		From: 	 s.from,
+		To:		 s.to,
+		Subject: "empty",
+		Body: 	 string(b),
 	}
+	jsonData, err := json.Marshal(mail)
+
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.Post("http://localhost:8081/emails", "application/json", bytes.NewBuffer(jsonData))
+
+	if err != nil {
+		log.Println("Error sending to API: ", err)
+	}
+
+	store.Store.Add(mail)
+
+	defer resp.Body.Close()
+
+	log.Println("Data send successfully", resp.StatusCode)
+
 	return nil
 }
 
@@ -71,7 +106,7 @@ func startServer() {
 func main() {
 	go startServer()
 
-	go sendmail.NewMail()
+	go api.ApiServer()
 
 	select {}
 }
