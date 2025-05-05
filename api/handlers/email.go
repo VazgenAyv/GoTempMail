@@ -27,3 +27,17 @@ func GetMails(c *gin.Context) {
 	emails := store.Store.GetAll()
 	c.JSON(http.StatusOK, emails)
 }
+
+func GetMyMail (c *gin.Context) {
+	email := c.Query("email")
+
+	var filtered []models.Email
+
+	var emails = store.Store.GetAll()
+	for _, mail := range  emails {
+		if email == mail.To {
+			filtered = append(filtered, mail)
+		}
+	}
+	c.JSON(http.StatusOK, filtered)
+}

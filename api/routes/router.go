@@ -11,5 +11,6 @@ func RegisterRoutes(r *gin.Engine) {
 	{
 		emailRoutes.POST("/", handlers.ReceiveEmail)
 		emailRoutes.GET("/all", handlers.GetMails)
+		emailRoutes.GET("/email", handlers.GetMyMail)
 	}
 }

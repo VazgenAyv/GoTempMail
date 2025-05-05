@@ -9,9 +9,11 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/mail"
 
 	"github.com/emersion/go-sasl"
 	"github.com/emersion/go-smtp"
+	"github.com/jhillyerd/enmime"
 )
 
 
@@ -47,18 +49,35 @@ func (s *Session) Rcpt(to string, opts *smtp.RcptOptions) error {
 	return nil
 }
 
-func (s *Session) Data(r io.Reader) error {
+func ( s *Session) Data(r io.Reader) error {
 
-	b, err := io.ReadAll(r)
+	raw, err := io.ReadAll(r)
 	if err != nil {
+		log.Println("Failed to read message:", err)
 		return err
-	} 
+	}
+
+	msg, err := mail.ReadMessage(bytes.NewReader(raw))
+	if err != nil {
+		log.Println("Failed to parse headers: ", err)
+		return err
+	}
+
+	subject := msg.Header.Get("Subject")
+	date := msg.Header.Get("Date")
+
+	env, err := enmime.ReadEnvelope(bytes.NewReader(raw))
+	if err != nil {
+		log.Println("Failed to parse MIME envelope: ", err)
+		return err
+	}
 
 	mail := models.Email{
 		From: 	 s.from,
 		To:		 s.to,
-		Subject: "empty",
-		Body: 	 string(b),
+		Subject: subject,
+		Body: 	 env.Text,
+		Date: 	 date,
 	}
 	jsonData, err := json.Marshal(mail)
 
@@ -66,7 +85,7 @@ func (s *Session) Data(r io.Reader) error {
 		return err
 	}
 
-	resp, err := http.Post("http://localhost:8081/emails", "application/json", bytes.NewBuffer(jsonData))
+	resp, err := http.Post("http://localhost:8081/emails/", "application/json", bytes.NewBuffer(jsonData))
 
 	if err != nil {
 		log.Println("Error sending to API: ", err)
