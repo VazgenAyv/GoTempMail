@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"gotempmail/api"
 	"gotempmail/models"
@@ -10,6 +11,8 @@ import (
 	"log"
 	"net/http"
 	"net/mail"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/emersion/go-sasl"
 	"github.com/emersion/go-smtp"
@@ -106,7 +109,7 @@ func (s *Session) Logout() error {
 	return nil
 }
 
-func startServer() {
+func startServer() error {
 	be := &Backend{}
 	s := smtp.NewServer(be)
 
@@ -116,16 +119,23 @@ func startServer() {
 
 	log.Println("SMTP Running at", s.Addr)
 
-	if err := s.ListenAndServe(); err != nil {
-		log.Fatal(err)
-	}
+	return s.ListenAndServe()
 
 }
 
 func main() {
-	go startServer()
+	ctx := context.Background()
+	g, ctx := errgroup.WithContext(ctx)
+	
+	g.Go(func() error {
+		return api.ApiServer()
+	})
 
-	go api.ApiServer()
+	g.Go(func() error {
+		return startServer()
+	})
 
-	select {}
+	if err := g.Wait(); err != nil {
+		log.Fatalf("Server error: %v", err)
+	}
 }

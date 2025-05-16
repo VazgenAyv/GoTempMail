@@ -1,13 +1,33 @@
 package handlers
 
 import (
+	"fmt"
 	"gotempmail/models"
 	"gotempmail/store"
 	"log"
+	"math/rand"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
+
+const charset = "abcdefghijklmnopqrstuvwxyz"
+
+func randomString(length int) string {
+	b := strings.Builder{}
+	for i := 0; i < length; i++ {
+		b.WriteByte(charset[rand.Intn(len(charset))])
+	}
+	return b.String()
+}
+
+func randomEmail() string {
+	user := randomString(6)
+	domain := randomString(6)
+	tld := []string{"com", "net", "org", "io"}[rand.Intn(4)]
+	return fmt.Sprintf("%s@%s.%s", user, domain, tld)
+}
 
 var request models.Email
 
@@ -40,4 +60,10 @@ func GetMyMail (c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, filtered)
+}
+
+func GetEmail (c *gin.Context) {
+	newEmail := randomEmail()
+	log.Println(newEmail)
+	c.JSON(http.StatusOK, gin.H{"email": newEmail})
 }
